@@ -48,4 +48,4 @@ def ocr_image(path):
         if img is None:
             return ""
         return pytesseract.image_to_string(preprocess(img), config="--psm 6").lower().strip()
-    except Exception 
+    except Exception as e:

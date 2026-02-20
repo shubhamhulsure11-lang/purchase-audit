@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Purchase Audit System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --card: #21253a; --border: #2e3350;
+    --accent: #6c63ff; --accent2: #00d4aa; --danger: #ff4d6d; --warn: #ffd166;
+    --text: #e8eaf6; --muted: #8b93b8; --radius: 16px;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px 80px; }
+  .header { text-align: center; margin-bottom: 48px; }
+  .header .badge { display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #6c63ff22, #00d4aa22); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 16px; font-size: 12px; font-weight: 600; color: var(--accent2);
+    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 20px; }
+  .header h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 800;
+    background: linear-gradient(135deg, #fff 30%, var(--accent)); -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent; line-height: 1.15; margin-bottom: 14px; }
+  .header p { font-size: 16px; color: var(--muted); max-width: 520px; margin: 0 auto; line-height: 1.7; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 36px; width: 100%; max-width: 640px; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: var(--radius) var(--radius) 0 0; }
+  .card h2 { font-size: 18px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
+  .card h2 .icon { width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa); display: flex; align-items: center;
+    justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 32px 20px;
+    text-align: center; cursor: pointer; transition: all 0.25s ease; position: relative;
+    margin-bottom: 20px; background: var(--card); }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: #6c63ff0f; }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-zone .dz-icon { font-size: 36px; margin-bottom: 10px; }
+  .drop-zone .dz-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .drop-zone .dz-sub { font-size: 12px; color: var(--muted); }
+  .drop-zone .dz-filename { margin-top: 10px; font-size: 13px; font-weight: 500; color: var(--accent2); display: none; }
+  .drop-zone.has-file { border-color: var(--accent2); background: #00d4aa0a; }
+  .btn-run { width: 100%; padding: 16px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa); color: #fff; font-size: 16px;
+    font-weight: 700; cursor: pointer; letter-spacing: 0.5px; transition: all 0.25s ease;
+    display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .btn-run:hover { transform: translateY(-2px); box-shadow: 0 8px 30px #6c63ff55; }
+  .btn-run:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+  .progress-wrap { display: none; margin-top: 28px; }
+  .progress-wrap.visible { display: block; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .progress-bar-bg { height: 8px; background: var(--card); border-radius: 999px; overflow: hidden; margin-bottom: 20px; }
+  .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 999px; transition: width 0.4s ease; }
+  .status-msg { font-size: 14px; color: var(--muted); text-align: center; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .dot { width: 12px; height: 12px; border-radius: 3px; }
+  .dot.g { background: #4ade80; } .dot.y { background: var(--warn); } .dot.r { background: var(--danger); }
+  .alert { display: none; padding: 14px 18px; border-radius: 10px; font-size: 14px; font-weight: 500; margin-top: 16px; }
+  .alert.error { background: #ff4d6d22; border: 1px solid var(--danger); color: var(--danger); }
+  .alert.success { background: #4ade8022; border: 1px solid #4ade80; color: #4ade80; }
+  .alert.visible { display: block; }
+  .steps { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 640px; margin-bottom: 24px; }
+  .step { display: flex; align-items: flex-start; gap: 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #a78bfa); display: flex; align-items: center;
+    justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0; color: white; }
+  .step-body strong { font-size: 14px; font-weight: 700; display: block; margin-bottom: 3px; }
+  .step-body span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="badge">⚡ AI-Powered · OCR · Smart Match</div>
+  <h1>Purchase Audit System</h1>
+  <p>Upload your Zoho bills export and ZIP of bill images. The system will OCR, match, and generate a color-coded audit report instantly.</p>
+</div>
+
+<div class="card">
+  <h2><span class="icon">📊</span> Upload Files</h2>
+  <form id="auditForm" enctype="multipart/form-data">
+    <div class="drop-zone" id="excelDrop">
+      <input type="file" name="excel" id="excelInput" accept=".xlsx,.xls,.csv" required />
+      <div class="dz-icon">📋</div>
+      <div class="dz-title">Zoho Purchase Excel / CSV</div>
+      <div class="dz-sub">Drag & drop or click · .xlsx · .xls · .csv</div>
+      <div class="dz-filename" id="excelName"></div>
+    </div>
+    <div class="drop-zone" id="zipDrop">
+      <input type="file" name="zipfile" id="zipInput" accept=".zip" required />
+      <div class="dz-icon">🗜️</div>
+      <div class="dz-title">Bill Images ZIP File</div>
+      <div class="dz-sub">Drag & drop or click · .zip · JPG · PNG · PDF supported</div>
+      <div class="dz-filename" id="zipName"></div>
+    </div>
+    <button type="submit" class="btn-run" id="runBtn"><span>🚀</span> Run Audit</button>
+    <div class="alert" id="alertBox"></div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label"><span>Processing…</span><span id="pctLabel">0%</span></div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      <div class="status-msg" id="statusMsg">🔍 Extracting and running OCR on bill images…</div>
+    </div>
+  </form>
+  <div class="legend">
+    <div class="legend-item"><div class="dot g"></div> Matched</div>
+    <div class="legend-item"><div class="dot y"></div> Not Found</div>
+    <div class="legend-item"><div class="dot r"></div> Duplicate</div>
+  </div>
+</div>
+
+<div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-body">
+    <strong>Upload Files</strong>
+    <span>Upload your Zoho CSV export and a ZIP folder containing all branch bill images and PDFs.</span>
+  </div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body">
+    <strong>OCR & Extract</strong>
+    <span>Every bill image and PDF is scanned using Tesseract OCR. Handwritten and printed bills are both supported.</span>
+  </div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body">
+    <strong>Smart Matching</strong>
+    <span>Each Excel row is matched against OCR text using Bill No, Vendor, Item Name and Amount with fuzzy logic.</span>
+  </div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-body">
+    <strong>Download Report</strong>
+    <span>A color-coded Excel report downloads automatically — Green (Matched), Yellow (Not Found), Red (Duplicate).</span>
+  </div></div>
+</div>
+
+<script>
+function setupDrop(dropId, inputId, nameId) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  const name = document.getElementById(nameId);
+  input.addEventListener("change", () => {
+    if (input.files[0]) { name.textContent = "✅ " + input.files[0].name; name.style.display = "block"; drop.classList.add("has-file"); }
+  });
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragover"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+  drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("dragover"); input.files = e.dataTransfer.files; input.dispatchEvent(new Event("change")); });
+}
+setupDrop("excelDrop", "excelInput", "excelName");
+setupDrop("zipDrop", "zipInput", "zipName");
+
+let progressInterval = null;
+function startProgress() {
+  let pct = 0;
+  const fill = document.getElementById("progressFill");
+  const lbl = document.getElementById("pctLabel");
+  const msgs = ["🗜️ Extracting ZIP…","📋 Reading Zoho Excel…","🔍 Running OCR on bill images…","🤖 Matching bills with fuzzy logic…","📊 Generating color-coded report…","✅ Almost done…"];
+  let mi = 0;
+  progressInterval = setInterval(() => {
+    if (pct < 90) { pct += Math.random() * 3; fill.style.width = Math.min(pct, 90) + "%"; lbl.textContent = Math.min(Math.round(pct), 90) + "%"; }
+    if (pct > (mi + 1) * 15 && mi < msgs.length - 1) { mi++; document.getElementById("statusMsg").textContent = msgs[mi]; }
+  }, 400);
+}
+function finishProgress() {
+  clearInterval(progressInterval);
+  document.getElementById("progressFill").style.width = "100%";
+  document.getElementById("pctLabel").textContent = "100%";
+  document.getElementById("statusMsg").textContent = "✅ Report ready! Downloading…";
+}
+
+document.getElementById("auditForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById("runBtn");
+  const alert = document.getElementById("alertBox");
+  const prog = document.getElementById("progressWrap");
+  alert.className = "alert"; alert.style.display = "none";
+  btn.disabled = true; btn.innerHTML = "<span>⏳</span> Running Audit…";
+  prog.classList.add("visible"); startProgress();
+  try {
+    const formData = new FormData(this);
+    const response = await fetch("/purchase_process", { method: "POST", body: formData });
+    finishProgress();
+    if (!response.ok) { const err = await response.json(); throw new Error(err.error || "Server error"); }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "Purchase_Audit_Report.xlsx"; a.click();
+    URL.revokeObjectURL(url);
+    alert.textContent = "✅ Audit complete! Your report is downloading.";
+    alert.className = "alert success visible";
+  } catch (err) {
+    finishProgress();
+    alert.textContent = "❌ " + err.message;
+    alert.className = "alert error visible";
+  } finally {
+    btn.disabled = false; btn.innerHTML = "<span>🚀</span> Run Audit";
+  }
+});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: purchase-audit
+    runtime: docker
+    plan: free
+    envVars:
+      - key: FLASK_ENV
+        value: production

@@ -1,198 +1,371 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Purchase Audit System</title>
+<title>Purchase Audit System — by Shubham Hulsure</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #0f1117; --surface: #1a1d27; --card: #21253a; --border: #2e3350;
-    --accent: #6c63ff; --accent2: #00d4aa; --danger: #ff4d6d; --warn: #ffd166;
-    --text: #e8eaf6; --muted: #8b93b8; --radius: 16px;
-  }
-  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
-    min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px 80px; }
-  .header { text-align: center; margin-bottom: 48px; }
-  .header .badge { display: inline-flex; align-items: center; gap: 8px;
-    background: linear-gradient(135deg, #6c63ff22, #00d4aa22); border: 1px solid var(--border);
-    border-radius: 999px; padding: 6px 16px; font-size: 12px; font-weight: 600; color: var(--accent2);
-    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 20px; }
-  .header h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 800;
-    background: linear-gradient(135deg, #fff 30%, var(--accent)); -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent; line-height: 1.15; margin-bottom: 14px; }
-  .header p { font-size: 16px; color: var(--muted); max-width: 520px; margin: 0 auto; line-height: 1.7; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 36px; width: 100%; max-width: 640px; margin-bottom: 24px; position: relative; overflow: hidden; }
-  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: var(--radius) var(--radius) 0 0; }
-  .card h2 { font-size: 18px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
-  .card h2 .icon { width: 36px; height: 36px; border-radius: 10px;
-    background: linear-gradient(135deg, var(--accent), #a78bfa); display: flex; align-items: center;
-    justify-content: center; font-size: 18px; flex-shrink: 0; }
-  .drop-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 32px 20px;
-    text-align: center; cursor: pointer; transition: all 0.25s ease; position: relative;
-    margin-bottom: 20px; background: var(--card); }
-  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: #6c63ff0f; }
-  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .drop-zone .dz-icon { font-size: 36px; margin-bottom: 10px; }
-  .drop-zone .dz-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-  .drop-zone .dz-sub { font-size: 12px; color: var(--muted); }
-  .drop-zone .dz-filename { margin-top: 10px; font-size: 13px; font-weight: 500; color: var(--accent2); display: none; }
-  .drop-zone.has-file { border-color: var(--accent2); background: #00d4aa0a; }
-  .btn-run { width: 100%; padding: 16px; border: none; border-radius: 12px;
-    background: linear-gradient(135deg, var(--accent), #a78bfa); color: #fff; font-size: 16px;
-    font-weight: 700; cursor: pointer; letter-spacing: 0.5px; transition: all 0.25s ease;
-    display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .btn-run:hover { transform: translateY(-2px); box-shadow: 0 8px 30px #6c63ff55; }
-  .btn-run:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
-  .progress-wrap { display: none; margin-top: 28px; }
-  .progress-wrap.visible { display: block; }
-  .progress-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
-  .progress-bar-bg { height: 8px; background: var(--card); border-radius: 999px; overflow: hidden; margin-bottom: 20px; }
-  .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-radius: 999px; transition: width 0.4s ease; }
-  .status-msg { font-size: 14px; color: var(--muted); text-align: center; animation: pulse 1.5s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-  .legend { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
-  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-  .dot { width: 12px; height: 12px; border-radius: 3px; }
-  .dot.g { background: #4ade80; } .dot.y { background: var(--warn); } .dot.r { background: var(--danger); }
-  .alert { display: none; padding: 14px 18px; border-radius: 10px; font-size: 14px; font-weight: 500; margin-top: 16px; }
-  .alert.error { background: #ff4d6d22; border: 1px solid var(--danger); color: var(--danger); }
-  .alert.success { background: #4ade8022; border: 1px solid #4ade80; color: #4ade80; }
-  .alert.visible { display: block; }
-  .steps { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 640px; margin-bottom: 24px; }
-  .step { display: flex; align-items: flex-start; gap: 16px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
-  .step-num { width: 32px; height: 32px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), #a78bfa); display: flex; align-items: center;
-    justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0; color: white; }
-  .step-body strong { font-size: 14px; font-weight: 700; display: block; margin-bottom: 3px; }
-  .step-body span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060818;--surface:rgba(255,255,255,0.04);--card:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.08);--accent:#7c6cff;--accent2:#00e5b4;
+  --danger:#ff4d6d;--warn:#ffd166;--text:#f0f2ff;--muted:#7b83a8;--radius:20px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* Animated background */
+.bg-orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.25;animation:float 12s ease-in-out infinite}
+.orb1{width:600px;height:600px;background:radial-gradient(circle,#7c6cff,transparent);top:-200px;left:-200px;animation-delay:0s}
+.orb2{width:500px;height:500px;background:radial-gradient(circle,#00e5b4,transparent);bottom:-150px;right:-150px;animation-delay:-4s}
+.orb3{width:400px;height:400px;background:radial-gradient(circle,#ff4d6d,transparent);top:40%;left:50%;animation-delay:-8s}
+@keyframes float{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-40px) scale(1.05)}}
+
+/* Grid lines */
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:60px 60px}
+
+/* Canvas particles */
+#particles{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+.page{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;padding:60px 16px 100px}
+
+/* Nav bar */
+.nav{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:center;margin-bottom:60px;padding:0 8px}
+.nav-logo{font-size:15px;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-pill{background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:999px;padding:6px 16px;font-size:12px;color:var(--muted);font-weight:500}
+
+/* Hero */
+.hero{text-align:center;margin-bottom:56px;max-width:700px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(124,108,255,.15),rgba(0,229,180,.15));border:1px solid rgba(124,108,255,.3);border-radius:999px;padding:8px 20px;font-size:12px;font-weight:600;color:var(--accent2);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px;backdrop-filter:blur(10px)}
+.hero-badge .dot-pulse{width:8px;height:8px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.hero h1{font-size:clamp(36px,6vw,72px);font-weight:900;line-height:1.08;letter-spacing:-2px;margin-bottom:20px}
+.hero h1 span{background:linear-gradient(135deg,#fff 20%,var(--accent) 60%,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:17px;color:var(--muted);line-height:1.8;max-width:560px;margin:0 auto}
+
+/* Glass card */
+.glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);width:100%;max-width:720px;margin-bottom:24px;overflow:hidden;position:relative}
+.glass::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent)}
+.glass-body{padding:36px}
+.card-title{font-size:17px;font-weight:700;display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.icon-box{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ib-purple{background:linear-gradient(135deg,#7c6cff,#a78bfa)}
+.ib-teal{background:linear-gradient(135deg,#00e5b4,#06b6d4)}
+.ib-orange{background:linear-gradient(135deg,#f97316,#ffd166)}
+
+/* Drop zones */
+.drop-zone{border:2px dashed rgba(255,255,255,.1);border-radius:14px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .3s ease;position:relative;margin-bottom:14px;background:rgba(255,255,255,.02)}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(124,108,255,.08);transform:translateY(-2px)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-icon{font-size:36px;margin-bottom:10px;filter:drop-shadow(0 0 12px var(--accent))}
+.drop-zone h3{font-size:15px;font-weight:600;margin-bottom:5px}
+.drop-zone p{font-size:12px;color:var(--muted)}
+.file-ok{margin-top:10px;color:var(--accent2);font-size:13px;font-weight:600;display:none;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
+.file-ok span{background:rgba(0,229,180,.1);border:1px solid rgba(0,229,180,.2);border-radius:999px;padding:4px 12px}
+
+/* Run button */
+.run-btn{width:100%;padding:20px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--accent),#a78bfa,var(--accent2));background-size:200% 200%;animation:gradShift 4s ease infinite;color:#fff;font-size:17px;font-weight:800;cursor:pointer;transition:all .3s;letter-spacing:.5px;position:relative;overflow:hidden;margin-top:8px}
+.run-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);opacity:0;transition:opacity .3s}
+.run-btn:hover:not(:disabled)::after{opacity:1}
+.run-btn:hover:not(:disabled){transform:translateY(-3px);box-shadow:0 12px 40px rgba(124,108,255,.5)}
+.run-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;animation:none}
+@keyframes gradShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+/* Progress */
+.progress-wrap{margin-top:28px;display:none;animation:fadeIn .4s ease}
+.progress-wrap.visible{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.prog-header{display:flex;justify-content:space-between;margin-bottom:10px}
+.prog-label{font-size:13px;font-weight:600;color:var(--accent2)}
+.prog-pct{font-size:13px;font-weight:800;color:#fff}
+.prog-track{height:10px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-bottom:14px;position:relative}
+.prog-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .6s cubic-bezier(.4,0,.2,1);width:0%;position:relative}
+.prog-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:20px;background:rgba(255,255,255,.4);filter:blur(4px);border-radius:999px;animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%,100%{opacity:0}50%{opacity:1}}
+.step-msg{font-size:13px;color:var(--muted);text-align:center;min-height:22px;font-style:italic}
+.legend{display:flex;gap:20px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%}
+
+/* Alert */
+.alert{border-radius:12px;padding:16px 20px;font-size:14px;font-weight:500;display:none;margin-top:14px;backdrop-filter:blur(10px)}
+.alert.visible{display:block}
+.alert.success{background:rgba(0,229,180,.1);border:1px solid rgba(0,229,180,.3);color:var(--accent2)}
+.alert.error{background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--danger)}
+
+/* Summary */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-top:20px}
+.s-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:18px 12px;text-align:center;transition:transform .2s}
+.s-box:hover{transform:translateY(-3px)}
+.s-val{font-size:32px;font-weight:900;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.s-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
+.c-teal{color:var(--accent2)}.c-purple{color:#a78bfa}.c-yellow{color:var(--warn)}.c-red{color:var(--danger)}.c-blue{color:#60a5fa}
+
+/* Steps */
+.steps{display:flex;flex-direction:column;gap:0}
+.step-row{display:flex;gap:20px;position:relative;padding-bottom:28px}
+.step-row:last-child{padding-bottom:0}
+.step-row:not(:last-child) .step-line{position:absolute;left:19px;top:38px;bottom:0;width:2px;background:linear-gradient(to bottom,var(--accent),transparent)}
+.step-num{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;box-shadow:0 0 20px rgba(124,108,255,.4)}
+.step-body h4{font-size:15px;font-weight:700;margin-bottom:5px;margin-top:8px}
+.step-body p{font-size:13px;color:var(--muted);line-height:1.7}
+
+/* Creator */
+.creator-glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);width:100%;max-width:720px;margin-bottom:24px;overflow:hidden;position:relative;text-align:center}
+.creator-glass::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent2),var(--accent),transparent)}
+.creator-inner{padding:44px 36px}
+.creator-glow{position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:200px;height:200px;background:radial-gradient(circle,rgba(0,229,180,.15),transparent);pointer-events:none}
+.avatar-ring{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:3px;margin:0 auto 18px;position:relative}
+.avatar-ring::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(124,108,255,.3);animation:spin 8s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.avatar-inner{width:100%;height:100%;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;background:linear-gradient(135deg,#1a1d27,#21253a)}
+.creator-name{font-size:24px;font-weight:900;letter-spacing:-1px;margin-bottom:4px;background:linear-gradient(135deg,#fff,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.creator-role{font-size:13px;color:var(--muted);margin-bottom:24px;font-weight:500}
+.contact-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.cpill{display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:11px 20px;font-size:13px;font-weight:600;color:var(--text);text-decoration:none;transition:all .25s;backdrop-filter:blur(10px)}
+.cpill:hover{background:rgba(0,229,180,.1);border-color:rgba(0,229,180,.4);color:var(--accent2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,229,180,.2)}
+.cpill .ci{font-size:16px}
+
+/* Footer */
+.footer{text-align:center;font-size:12px;color:var(--muted);margin-top:8px;opacity:.6}
 </style>
 </head>
 <body>
-<div class="header">
-  <div class="badge">⚡ AI-Powered · OCR · Smart Match</div>
-  <h1>Purchase Audit System</h1>
-  <p>Upload your Zoho bills export and ZIP of bill images. The system will OCR, match, and generate a color-coded audit report instantly.</p>
-</div>
+<div class="bg-orbs"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+<div class="bg-grid"></div>
+<canvas id="particles"></canvas>
 
-<div class="card">
-  <h2><span class="icon">📊</span> Upload Files</h2>
-  <form id="auditForm" enctype="multipart/form-data">
-    <div class="drop-zone" id="excelDrop">
-      <input type="file" name="excel" id="excelInput" accept=".xlsx,.xls,.csv" required />
-      <div class="dz-icon">📋</div>
-      <div class="dz-title">Zoho Purchase Excel / CSV</div>
-      <div class="dz-sub">Drag & drop or click · .xlsx · .xls · .csv</div>
-      <div class="dz-filename" id="excelName"></div>
-    </div>
-    <div class="drop-zone" id="zipDrop">
-      <input type="file" name="zipfile" id="zipInput" accept=".zip" required />
-      <div class="dz-icon">🗜️</div>
-      <div class="dz-title">Bill Images ZIP File</div>
-      <div class="dz-sub">Drag & drop or click · .zip · JPG · PNG · PDF supported</div>
-      <div class="dz-filename" id="zipName"></div>
-    </div>
-    <button type="submit" class="btn-run" id="runBtn"><span>🚀</span> Run Audit</button>
-    <div class="alert" id="alertBox"></div>
-    <div class="progress-wrap" id="progressWrap">
-      <div class="progress-label"><span>Processing…</span><span id="pctLabel">0%</span></div>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
-      <div class="status-msg" id="statusMsg">🔍 Extracting and running OCR on bill images…</div>
-    </div>
-  </form>
-  <div class="legend">
-    <div class="legend-item"><div class="dot g"></div> Matched</div>
-    <div class="legend-item"><div class="dot y"></div> Not Found</div>
-    <div class="legend-item"><div class="dot r"></div> Duplicate</div>
+<div class="page">
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="nav-logo">⚡ PurchaseAudit.AI</div>
+    <div class="nav-pill">🔒 Secure &amp; Private</div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-badge"><div class="dot-pulse"></div> AI-Powered OCR Audit Engine</div>
+    <h1><span>Purchase Audit</span><br>System</h1>
+    <p>Upload your Zoho bills export and a ZIP of bill images. The AI will OCR scan every bill, match against your records, and generate a colour-coded audit report — automatically.</p>
   </div>
-</div>
 
-<div class="steps">
-  <div class="step"><div class="step-num">1</div><div class="step-body">
-    <strong>Upload Files</strong>
-    <span>Upload your Zoho CSV export and a ZIP folder containing all branch bill images and PDFs.</span>
-  </div></div>
-  <div class="step"><div class="step-num">2</div><div class="step-body">
-    <strong>OCR & Extract</strong>
-    <span>Every bill image and PDF is scanned using Tesseract OCR. Handwritten and printed bills are both supported.</span>
-  </div></div>
-  <div class="step"><div class="step-num">3</div><div class="step-body">
-    <strong>Smart Matching</strong>
-    <span>Each Excel row is matched against OCR text using Bill No, Vendor, Item Name and Amount with fuzzy logic.</span>
-  </div></div>
-  <div class="step"><div class="step-num">4</div><div class="step-body">
-    <strong>Download Report</strong>
-    <span>A color-coded Excel report downloads automatically — Green (Matched), Yellow (Not Found), Red (Duplicate).</span>
-  </div></div>
+  <!-- Upload Card -->
+  <div class="glass">
+    <div class="glass-body">
+      <div class="card-title"><div class="icon-box ib-purple">📁</div> Upload Your Files</div>
+      <form id="auditForm">
+        <div class="drop-zone" id="excelZone">
+          <div class="dz-icon">📋</div>
+          <h3>Zoho Purchase Excel / CSV</h3>
+          <p>Drag &amp; drop or click &nbsp;·&nbsp; .xlsx &nbsp;·&nbsp; .xls &nbsp;·&nbsp; .csv</p>
+          <input type="file" id="excelInput" name="excel" accept=".xlsx,.xls,.csv" required/>
+          <div class="file-ok" id="excelOk"><span id="excelName"></span></div>
+        </div>
+        <div class="drop-zone" id="zipZone">
+          <div class="dz-icon">🗜️</div>
+          <h3>Bill Images ZIP File</h3>
+          <p>Drag &amp; drop or click &nbsp;·&nbsp; .zip &nbsp;·&nbsp; JPG · PNG · PDF supported</p>
+          <input type="file" id="zipInput" name="zipfile" accept=".zip" required/>
+          <div class="file-ok" id="zipOk"><span id="zipName"></span></div>
+        </div>
+        <button type="submit" class="run-btn" id="runBtn">🚀 &nbsp;Run Audit</button>
+      </form>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="prog-header">
+          <span class="prog-label" id="progLabel">Processing...</span>
+          <span class="prog-pct" id="pctLabel">0%</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+        <div class="step-msg" id="stepMsg">Starting up...</div>
+        <div class="legend">
+          <div class="legend-item"><div class="dot" style="background:#00e5b4"></div>Matched</div>
+          <div class="legend-item"><div class="dot" style="background:#ffd166"></div>Not Found</div>
+          <div class="legend-item"><div class="dot" style="background:#ff4d6d"></div>Duplicate</div>
+        </div>
+      </div>
+
+      <div class="alert" id="alertBox"></div>
+
+      <div id="summaryWrap" style="display:none">
+        <div class="summary-grid">
+          <div class="s-box"><div class="s-val c-blue" id="sTotal">0</div><div class="s-lbl">Total Bills</div></div>
+          <div class="s-box"><div class="s-val c-teal" id="sMatched">0</div><div class="s-lbl">Matched</div></div>
+          <div class="s-box"><div class="s-val c-yellow" id="sNotFound">0</div><div class="s-lbl">Not Found</div></div>
+          <div class="s-box"><div class="s-val c-red" id="sDuplicate">0</div><div class="s-lbl">Duplicate</div></div>
+          <div class="s-box"><div class="s-val c-purple" id="sZip">0</div><div class="s-lbl">Bills in ZIP</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="glass">
+    <div class="glass-body">
+      <div class="card-title"><div class="icon-box ib-teal">⚙️</div> How It Works</div>
+      <div class="steps">
+        <div class="step-row">
+          <div><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body"><h4>Upload Files</h4><p>Upload your Zoho CSV export and a ZIP folder containing all branch bill images and PDFs.</p></div>
+        </div>
+        <div class="step-row">
+          <div><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body"><h4>OCR &amp; Extract</h4><p>Every bill image is scanned using AI-powered Tesseract OCR to extract printed text — even from blurry images.</p></div>
+        </div>
+        <div class="step-row">
+          <div><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body"><h4>Smart Matching</h4><p>Each Excel row is matched to bills using fuzzy AI matching on bill number, vendor, item name and amount.</p></div>
+        </div>
+        <div class="step-row">
+          <div><div class="step-num">4</div></div>
+          <div class="step-body"><h4>Download Report</h4><p>A colour-coded Excel report is generated instantly — Matched 🟢, Not Found 🟡, Duplicate 🔴.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Creator -->
+  <div class="creator-glass">
+    <div class="creator-inner">
+      <div class="creator-glow"></div>
+      <div class="avatar-ring"><div class="avatar-inner">SH</div></div>
+      <div class="creator-name">Shubham Hulsure</div>
+      <div class="creator-role">🛠️ Built &amp; Designed this Purchase Audit System</div>
+      <div class="contact-row">
+        <a class="cpill" href="tel:+918143241345"><span class="ci">📞</span> +91 81432 41345</a>
+        <a class="cpill" href="mailto:shubhamhulsure11@gmail.com"><span class="ci">✉️</span> shubhamhulsure11@gmail.com</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">© 2026 Purchase Audit System · Built by Shubham Hulsure</div>
 </div>
 
 <script>
-function setupDrop(dropId, inputId, nameId) {
-  const drop = document.getElementById(dropId);
-  const input = document.getElementById(inputId);
-  const name = document.getElementById(nameId);
-  input.addEventListener("change", () => {
-    if (input.files[0]) { name.textContent = "✅ " + input.files[0].name; name.style.display = "block"; drop.classList.add("has-file"); }
-  });
-  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragover"); });
-  drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
-  drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("dragover"); input.files = e.dataTransfer.files; input.dispatchEvent(new Event("change")); });
-}
-setupDrop("excelDrop", "excelInput", "excelName");
-setupDrop("zipDrop", "zipInput", "zipName");
-
-let progressInterval = null;
-function startProgress() {
-  let pct = 0;
-  const fill = document.getElementById("progressFill");
-  const lbl = document.getElementById("pctLabel");
-  const msgs = ["🗜️ Extracting ZIP…","📋 Reading Zoho Excel…","🔍 Running OCR on bill images…","🤖 Matching bills with fuzzy logic…","📊 Generating color-coded report…","✅ Almost done…"];
-  let mi = 0;
-  progressInterval = setInterval(() => {
-    if (pct < 90) { pct += Math.random() * 3; fill.style.width = Math.min(pct, 90) + "%"; lbl.textContent = Math.min(Math.round(pct), 90) + "%"; }
-    if (pct > (mi + 1) * 15 && mi < msgs.length - 1) { mi++; document.getElementById("statusMsg").textContent = msgs[mi]; }
-  }, 400);
-}
-function finishProgress() {
-  clearInterval(progressInterval);
-  document.getElementById("progressFill").style.width = "100%";
-  document.getElementById("pctLabel").textContent = "100%";
-  document.getElementById("statusMsg").textContent = "✅ Report ready! Downloading…";
-}
-
-document.getElementById("auditForm").addEventListener("submit", async function(e) {
-  e.preventDefault();
-  const btn = document.getElementById("runBtn");
-  const alert = document.getElementById("alertBox");
-  const prog = document.getElementById("progressWrap");
-  alert.className = "alert"; alert.style.display = "none";
-  btn.disabled = true; btn.innerHTML = "<span>⏳</span> Running Audit…";
-  prog.classList.add("visible"); startProgress();
-  try {
-    const formData = new FormData(this);
-    const response = await fetch("/purchase_process", { method: "POST", body: formData });
-    finishProgress();
-    if (!response.ok) { const err = await response.json(); throw new Error(err.error || "Server error"); }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "Purchase_Audit_Report.xlsx"; a.click();
-    URL.revokeObjectURL(url);
-    alert.textContent = "✅ Audit complete! Your report is downloading.";
-    alert.className = "alert success visible";
-  } catch (err) {
-    finishProgress();
-    alert.textContent = "❌ " + err.message;
-    alert.className = "alert error visible";
-  } finally {
-    btn.disabled = false; btn.innerHTML = "<span>🚀</span> Run Audit";
+// Particles
+(function(){
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+  function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+  for(let i=0;i<60;i++) particles.push({x:Math.random()*9999,y:Math.random()*9999,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.5+.1});
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0)p.x=W; if(p.x>W)p.x=0;
+      if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+      ctx.beginPath();ctx.arc(p.x%W,p.y%H,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(124,108,255,${p.o})`;ctx.fill();
+    });
+    requestAnimationFrame(draw);
   }
+  draw();
+})();
+
+// File labels
+function setupFile(inputId, okId, nameId){
+  const input=document.getElementById(inputId);
+  const ok=document.getElementById(okId);
+  const nm=document.getElementById(nameId);
+  input.addEventListener('change',()=>{
+    if(input.files[0]){ nm.textContent='✅ '+input.files[0].name; ok.style.display='flex'; }
+  });
+}
+setupFile('excelInput','excelOk','excelName');
+setupFile('zipInput','zipOk','zipName');
+
+['excelZone','zipZone'].forEach(id=>{
+  const z=document.getElementById(id);
+  z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('dragover');});
+  z.addEventListener('dragleave',()=>z.classList.remove('dragover'));
+  z.addEventListener('drop',()=>z.classList.remove('dragover'));
 });
+
+// Animated counter
+function animateCount(el, target){
+  let start=0, duration=1200, startTime=null;
+  function step(ts){
+    if(!startTime) startTime=ts;
+    const p=Math.min((ts-startTime)/duration,1);
+    el.textContent=Math.floor(p*target);
+    if(p<1) requestAnimationFrame(step); else el.textContent=target;
+  }
+  requestAnimationFrame(step);
+}
+
+// Form submit
+document.getElementById('auditForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const btn=document.getElementById('runBtn');
+  const alertBox=document.getElementById('alertBox');
+  const progWrap=document.getElementById('progressWrap');
+  const progFill=document.getElementById('progFill');
+  const pctLabel=document.getElementById('pctLabel');
+  const stepMsg=document.getElementById('stepMsg');
+  const summary=document.getElementById('summaryWrap');
+
+  alertBox.className='alert'; alertBox.style.display='none';
+  summary.style.display='none';
+  btn.disabled=true; btn.textContent='⏳  Uploading...';
+  progWrap.classList.add('visible');
+  progFill.style.width='2%'; pctLabel.textContent='2%';
+  stepMsg.textContent='Uploading files to server...';
+
+  let job_id;
+  try{
+    const fd=new FormData(this);
+    const res=await fetch('/purchase_process',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok||data.error) throw new Error(data.error||'Upload failed');
+    job_id=data.job_id;
+  } catch(err){ showErr(err.message); btn.disabled=false; btn.innerHTML='🚀 &nbsp;Run Audit'; return; }
+
+  btn.textContent='🔄  Processing...';
+  stepMsg.textContent='Files uploaded! Starting OCR scan...';
+
+  const timer=setInterval(async()=>{
+    try{
+      const res=await fetch('/status/'+job_id);
+      const job=await res.json();
+      progFill.style.width=job.progress+'%';
+      pctLabel.textContent=job.progress+'%';
+      stepMsg.textContent=job.step||'Processing...';
+
+      if(job.status==='done'){
+        clearInterval(timer);
+        progFill.style.width='100%'; pctLabel.textContent='100%';
+        stepMsg.textContent='✅ Audit complete! Your report is downloading...';
+        if(job.summary){
+          animateCount(document.getElementById('sTotal'),job.summary.total_excel);
+          animateCount(document.getElementById('sMatched'),job.summary.matched);
+          animateCount(document.getElementById('sNotFound'),job.summary.not_found);
+          animateCount(document.getElementById('sDuplicate'),job.summary.duplicate);
+          animateCount(document.getElementById('sZip'),job.summary.total_zip);
+          summary.style.display='block';
+        }
+        window.location.href='/download/'+job_id;
+        btn.disabled=false; btn.innerHTML='🚀 &nbsp;Run Audit';
+      }
+      if(job.status==='error'){
+        clearInterval(timer);
+        showErr(job.error||'Something went wrong.');
+        btn.disabled=false; btn.innerHTML='🚀 &nbsp;Run Audit';
+      }
+    } catch(_){}
+  },2000);
+});
+
+function showErr(msg){
+  const a=document.getElementById('alertBox');
+  a.textContent='❌ '+msg;
+  a.className='alert error visible';
+}
 </script>
 </body>
 </html>
-

@@ -1,4 +1,4 @@
-import os, zipfile, shutil, uuid, cv2, fitz
+import os, zipfile, shutil, uuid, cv2, fitz, threading
 import numpy as np
 import pytesseract
 import pandas as pd
@@ -19,7 +19,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(REPORT_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+
+# In-memory job store
+JOBS = {}
 
 def safe_str(val):
     if val is None or (isinstance(val, float) and pd.isna(val)):
@@ -75,10 +78,10 @@ def match_score(bill_no, vendor, item, total, text):
         (15 if total and total in text else 0), 2
     )
 
-GREEN = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+GREEN  = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
 YELLOW = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
-RED = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-BLUE = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+RED    = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+BLUE   = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
 STATUS_FILL = {"Matched": GREEN, "Not Found": YELLOW, "Duplicate": RED}
 
 def style_report(path):
@@ -105,145 +108,236 @@ def style_report(path):
             ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
     wb.save(path)
 
+def run_audit_job(job_id, excel_path, zip_path, sess_dir):
+    job = JOBS[job_id]
+    try:
+        # Step 1: Read Excel
+        job["step"] = "Reading Excel file..."
+        job["progress"] = 2
+        try:
+            df = (pd.read_csv(excel_path, dtype=str)
+                  if excel_path.lower().endswith(".csv")
+                  else pd.read_excel(excel_path, engine="openpyxl", dtype=str))
+        except Exception as e:
+            job["status"] = "error"
+            job["error"] = f"Cannot read Excel: {e}"
+            return
+
+        df.columns = df.columns.str.strip()
+        df = df.fillna("")
+        if df.empty:
+            job["status"] = "error"
+            job["error"] = "Excel file has no data rows."
+            return
+
+        for col in REQUIRED_COLS:
+            if col not in df.columns:
+                df[col] = ""
+        df = df[REQUIRED_COLS].copy()
+
+        # Step 2: Extract ZIP
+        job["step"] = "Extracting ZIP file..."
+        job["progress"] = 5
+        extract_dir = os.path.join(sess_dir, "bills")
+        os.makedirs(extract_dir, exist_ok=True)
+        try:
+            with zipfile.ZipFile(zip_path, "r") as z:
+                z.extractall(extract_dir)
+        except zipfile.BadZipFile:
+            job["status"] = "error"
+            job["error"] = "ZIP file is corrupted or invalid."
+            return
+
+        # Step 3: Find bill files
+        bill_files = []
+        for root, dirs, files in os.walk(extract_dir):
+            rel = os.path.relpath(root, extract_dir)
+            if is_ignored_folder(rel):
+                dirs.clear()
+                continue
+            for f in files:
+                if f.lower().endswith(ALLOWED_BILL_EXT) and not f.startswith("."):
+                    bill_files.append(os.path.join(root, f))
+
+        total_in_zip = len(bill_files)
+        if total_in_zip == 0:
+            job["status"] = "error"
+            job["error"] = "No bill files found in ZIP."
+            return
+
+        job["total_bills"] = total_in_zip
+
+        # Step 4: OCR all bills
+        ocr_results = []
+        for i, path in enumerate(bill_files, 1):
+            name = os.path.basename(path)
+            job["step"] = f"OCR scanning bill {i} of {total_in_zip}: {name}"
+            job["progress"] = int(5 + (i / total_in_zip) * 60)
+            job["ocr_done"] = i
+            text = read_bill(path)
+            if text.strip():
+                ocr_results.append((path, text))
+
+        # Step 5: Match
+        job["step"] = f"Matching {len(df)} Excel rows to bills..."
+        job["progress"] = 70
+        raw = []
+        bill_seen = {}
+        for idx, row in df.iterrows():
+            bn  = safe_str(row["Bill Number"])
+            ven = safe_str(row["Vendor Name"])
+            itm = safe_str(row["Item Name"])
+            tot = safe_str(row["Item Total"])
+            best, best_path = 0, ""
+            for path, txt in ocr_results:
+                s = match_score(bn, ven, itm, tot, txt)
+                if s > best:
+                    best, best_path = s, path
+            raw.append({"bill_no": bn, "score": best, "path": best_path})
+            if bn:
+                bill_seen.setdefault(bn, []).append(idx)
+
+        # Step 6: Build statuses
+        job["step"] = "Building audit results..."
+        job["progress"] = 80
+        statuses, remarks, scores, sources = [], [], [], []
+        matched_paths = set()
+        for r in raw:
+            bn, score, path = r["bill_no"], r["score"], r["path"]
+            is_dup = bn and len(bill_seen.get(bn, [])) > 1
+            if is_dup:
+                statuses.append("Duplicate")
+                remarks.append(f"Bill '{bn}' appears multiple times in Excel")
+                sources.append(os.path.basename(path) if path else "")
+                scores.append(score)
+            elif score >= 82:
+                statuses.append("Matched")
+                remarks.append("Key fields matched (Bill No, Vendor, Item, Amount)")
+                sources.append(os.path.basename(path))
+                scores.append(score)
+                matched_paths.add(path)
+            else:
+                statuses.append("Not Found")
+                remarks.append("No matching bill image found in ZIP")
+                sources.append("")
+                scores.append(score)
+
+        df["AI Status"]   = statuses
+        df["AI Remark"]   = remarks
+        df["Match Score"] = scores
+        df["Source File"] = sources
+
+        t_excel       = len(df)
+        t_matched     = statuses.count("Matched")
+        t_notfound    = statuses.count("Not Found")
+        t_duplicate   = statuses.count("Duplicate")
+        t_zip         = total_in_zip
+        t_unaccounted = t_zip - len(matched_paths)
+
+        # Step 7: Write report
+        job["step"] = "Writing Excel report..."
+        job["progress"] = 90
+        report_name = f"Purchase_Audit_{job_id}.xlsx"
+        report_path = os.path.join(REPORT_FOLDER, report_name)
+        with pd.ExcelWriter(report_path, engine="openpyxl") as w:
+            df.to_excel(w, sheet_name="Audit Report", index=False)
+            pd.DataFrame({
+                "Metric": ["Total Bills in Excel","Matched","Not Found",
+                           "Duplicates","Total Bills in ZIP","ZIP Bills not in Excel"],
+                "Count":  [t_excel, t_matched, t_notfound,
+                           t_duplicate, t_zip, t_unaccounted]
+            }).to_excel(w, sheet_name="Summary", index=False)
+
+        style_report(report_path)
+
+        try:
+            shutil.rmtree(sess_dir)
+        except Exception:
+            pass
+
+        job["step"]        = "Done!"
+        job["progress"]    = 100
+        job["status"]      = "done"
+        job["report_name"] = report_name
+        job["summary"] = {
+            "matched": t_matched,
+            "not_found": t_notfound,
+            "duplicate": t_duplicate,
+            "total_excel": t_excel,
+            "total_zip": t_zip
+        }
+
+    except Exception as e:
+        job["status"] = "error"
+        job["error"]  = str(e)
+
+
 @app.route("/", methods=["GET"])
 def home():
     return render_template("index.html")
 
+
 @app.route("/purchase_process", methods=["POST"])
 def purchase_process():
-    print("\n PURCHASE AUDIT STARTED\n")
     excel_file = request.files.get("excel")
-    zip_file = request.files.get("zipfile")
+    zip_file   = request.files.get("zipfile")
     if not excel_file or excel_file.filename == "":
         return jsonify({"error": "Excel file is missing."}), 400
     if not zip_file or zip_file.filename == "":
         return jsonify({"error": "ZIP file is missing."}), 400
+
     excel_name = secure_filename(excel_file.filename)
-    zip_name = secure_filename(zip_file.filename)
+    zip_name   = secure_filename(zip_file.filename)
     if not excel_name.lower().endswith((".xlsx", ".xls", ".csv")):
         return jsonify({"error": "Excel must be .xlsx / .xls / .csv"}), 400
     if not zip_name.lower().endswith(".zip"):
         return jsonify({"error": "Bills file must be a .zip"}), 400
-    sid = uuid.uuid4().hex[:10]
-    sess_dir = os.path.join(UPLOAD_FOLDER, sid)
+
+    job_id   = uuid.uuid4().hex[:10]
+    sess_dir = os.path.join(UPLOAD_FOLDER, job_id)
     os.makedirs(sess_dir, exist_ok=True)
+
     excel_path = os.path.join(sess_dir, excel_name)
-    zip_path = os.path.join(sess_dir, zip_name)
+    zip_path   = os.path.join(sess_dir, zip_name)
     excel_file.save(excel_path)
     zip_file.save(zip_path)
-    try:
-        df = (pd.read_csv(excel_path, dtype=str)
-              if excel_path.lower().endswith(".csv")
-              else pd.read_excel(excel_path, engine="openpyxl", dtype=str))
-    except Exception as e:
-        return jsonify({"error": f"Cannot read Excel: {e}"}), 400
-    df.columns = df.columns.str.strip()
-    df = df.fillna("")
-    if df.empty:
-        return jsonify({"error": "Excel file has no data rows."}), 400
-    for col in REQUIRED_COLS:
-        if col not in df.columns:
-            df[col] = ""
-    df = df[REQUIRED_COLS].copy()
-    extract_dir = os.path.join(sess_dir, "bills")
-    os.makedirs(extract_dir, exist_ok=True)
-    try:
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall(extract_dir)
-    except zipfile.BadZipFile:
-        return jsonify({"error": "ZIP file is corrupted or invalid."}), 400
-    bill_files = []
-    for root, dirs, files in os.walk(extract_dir):
-        rel = os.path.relpath(root, extract_dir)
-        if is_ignored_folder(rel):
-            dirs.clear()
-            continue
-        for f in files:
-            if f.lower().endswith(ALLOWED_BILL_EXT) and not f.startswith("."):
-                bill_files.append(os.path.join(root, f))
-    total_in_zip = len(bill_files)
-    if total_in_zip == 0:
-        return jsonify({"error": "No bill files found in ZIP."}), 400
-    ocr_results = []
-    for i, path in enumerate(bill_files, 1):
-        name = os.path.basename(path)
-        print(f"OCR [{i}/{total_in_zip}] {name}")
-        text = read_bill(path)
-        if text.strip():
-            ocr_results.append((path, text))
-        print(f"Progress: {int(i / total_in_zip * 100)}%")
-    raw = []
-    bill_seen = {}
-    for idx, row in df.iterrows():
-        bn = safe_str(row["Bill Number"])
-        ven = safe_str(row["Vendor Name"])
-        itm = safe_str(row["Item Name"])
-        tot = safe_str(row["Item Total"])
-        best, best_path = 0, ""
-        for path, txt in ocr_results:
-            s = match_score(bn, ven, itm, tot, txt)
-            if s > best:
-                best, best_path = s, path
-        raw.append({"bill_no": bn, "score": best, "path": best_path})
-        if bn:
-            bill_seen.setdefault(bn, []).append(idx)
-    statuses, remarks, scores, sources = [], [], [], []
-    matched_paths = set()
-    for r in raw:
-        bn, score, path = r["bill_no"], r["score"], r["path"]
-        is_dup = bn and len(bill_seen.get(bn, [])) > 1
-        if is_dup:
-            statuses.append("Duplicate")
-            remarks.append(f"Bill '{bn}' appears multiple times in Excel")
-            sources.append(os.path.basename(path) if path else "")
-            scores.append(score)
-        elif score >= 82:
-            statuses.append("Matched")
-            remarks.append("Key fields matched (Bill No, Vendor, Item, Amount)")
-            sources.append(os.path.basename(path))
-            scores.append(score)
-            matched_paths.add(path)
-        else:
-            statuses.append("Not Found")
-            remarks.append("No matching bill image found in ZIP")
-            sources.append("")
-            scores.append(score)
-    df["AI Status"] = statuses
-    df["AI Remark"] = remarks
-    df["Match Score"] = scores
-    df["Source File"] = sources
-    t_excel = len(df)
-    t_matched = statuses.count("Matched")
-    t_notfound = statuses.count("Not Found")
-    t_duplicate = statuses.count("Duplicate")
-    t_zip = total_in_zip
-    t_unaccounted = t_zip - len(matched_paths)
-    report_name = f"Purchase_Audit_{sid}.xlsx"
-    report_path = os.path.join(REPORT_FOLDER, report_name)
-    with pd.ExcelWriter(report_path, engine="openpyxl") as w:
-        df.to_excel(w, sheet_name="Audit Report", index=False)
-        pd.DataFrame({
-            "Metric": [
-                "Total Bills in Excel",
-                "Matched",
-                "Not Found",
-                "Duplicates",
-                "Total Bills in ZIP",
-                "ZIP Bills not in Excel",
-            ],
-            "Count": [t_excel, t_matched, t_notfound, t_duplicate, t_zip, t_unaccounted]
-        }).to_excel(w, sheet_name="Summary", index=False)
-    style_report(report_path)
-    try:
-        shutil.rmtree(sess_dir)
-    except Exception:
-        pass
+
+    JOBS[job_id] = {
+        "status": "running",
+        "progress": 0,
+        "step": "Starting...",
+        "ocr_done": 0,
+        "total_bills": 0
+    }
+
+    t = threading.Thread(target=run_audit_job,
+                         args=(job_id, excel_path, zip_path, sess_dir),
+                         daemon=True)
+    t.start()
+
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/status/<job_id>")
+def status(job_id):
+    job = JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+
+@app.route("/download/<job_id>")
+def download(job_id):
+    job = JOBS.get(job_id)
+    if not job or job.get("status") != "done":
+        return jsonify({"error": "Report not ready"}), 404
+    report_path = os.path.join(REPORT_FOLDER, job["report_name"])
     return send_file(
         report_path, as_attachment=True,
         download_name="Purchase_Audit_Report.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
-

@@ -1,9 +1,9 @@
-flask==3.0.3
-pandas==2.2.2
-openpyxl==3.1.4
-pytesseract==0.3.13
-opencv-python-headless==4.10.0.84
-PyMuPDF
+flask
+pandas
+openpyxl
+pymupdf
+opencv-python-headless
+pytesseract
 rapidfuzz
-openai
-pillow
+werkzeug
+gunicorn

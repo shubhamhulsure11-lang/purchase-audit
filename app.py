@@ -205,7 +205,7 @@ HTML = """
           document.getElementById('statusText').textContent = 'Failed';
         }
       } catch (e) { addLog('Error: ' + e.message, 'err'); }
-      btn.disabled = false; btn.textContent = '\uD83D\uDE80 Start Audit';
+      btn.disabled = false; btn.textContent = 'Start Audit';
     }
     function downloadReport() {
       if (reportFile) window.location.href = '/download/' + reportFile;

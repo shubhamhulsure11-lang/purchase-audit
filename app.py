@@ -19,219 +19,725 @@ IGNORE_FOLDERS = {
     "receipts", "__macosx", ".ds_store", "payment"
 }
 
-# In-memory job store
 jobs = {}
 
-HTML = """
-<!DOCTYPE html>
+HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Purchase Audit System</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-    .header{background:linear-gradient(135deg,#1e293b,#0f172a);padding:20px 40px;
-            border-bottom:1px solid #334155;display:flex;align-items:center;gap:15px}
-    .header h1{font-size:24px;font-weight:700;color:#fff}
-    .badge{background:#3b82f6;color:#fff;padding:3px 10px;border-radius:20px;font-size:12px}
-    .container{max-width:900px;margin:40px auto;padding:0 20px}
-    .card{background:#1e293b;border-radius:16px;padding:30px;border:1px solid #334155;margin-bottom:20px}
-    .card h2{font-size:18px;font-weight:600;margin-bottom:20px;color:#f1f5f9}
-    .upload-area{border:2px dashed #334155;border-radius:12px;padding:50px;
-                 text-align:center;cursor:pointer;transition:all .3s}
-    .upload-area:hover,.upload-area.dragover{border-color:#3b82f6;background:rgba(59,130,246,.05)}
-    .upload-area .icon{font-size:48px;margin-bottom:15px}
-    .upload-area p{color:#94a3b8;margin-bottom:5px}
-    .upload-area strong{color:#3b82f6}
-    .btn{background:#3b82f6;color:#fff;border:none;padding:12px 30px;border-radius:8px;
-         font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:15px}
-    .btn:hover{background:#2563eb}
-    .btn:disabled{background:#475569;cursor:not-allowed}
-    .progress-area{display:none}
-    .progress-bar-wrap{background:#0f172a;border-radius:8px;height:8px;margin:15px 0;overflow:hidden}
-    .progress-bar{background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;
-                  width:0%;transition:width .6s;border-radius:8px}
-    .status-text{color:#94a3b8;font-size:14px;text-align:center;margin-bottom:10px}
-    .result-area{display:none}
-    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:20px}
-    .stat{background:#0f172a;border-radius:10px;padding:20px;text-align:center;border:1px solid #334155}
-    .stat .num{font-size:32px;font-weight:700;color:#3b82f6}
-    .stat .label{font-size:13px;color:#94a3b8;margin-top:5px}
-    .download-btn{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;
-                  padding:15px 30px;border-radius:10px;font-size:16px;font-weight:600;
-                  cursor:pointer;width:100%}
-    .download-btn:hover{transform:translateY(-2px)}
-    .log{background:#0f172a;border-radius:8px;padding:15px;max-height:280px;overflow-y:auto;
-         font-family:monospace;font-size:12px;margin-top:15px;line-height:1.6}
-    .log-item{padding:2px 0;border-bottom:1px solid #1a2035}
-    .log-item.ok{color:#10b981}
-    .log-item.err{color:#ef4444}
-    .log-item.info{color:#94a3b8}
-    input[type="file"]{display:none}
-    .powered{text-align:center;color:#475569;font-size:12px;margin-top:30px;padding-bottom:30px}
-    .csv-upload{border:1px dashed #334155;border-radius:8px;padding:15px;text-align:center;
-                cursor:pointer;margin-top:10px;transition:all .3s}
-    .csv-upload:hover{border-color:#3b82f6}
-    .err-box{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
-             border-radius:8px;padding:14px;color:#ef4444;display:none;margin-top:12px;font-size:14px}
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AuditLens — Purchase Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --ink:#05080f;
+  --ink2:#0d1220;
+  --surface:rgba(255,255,255,0.03);
+  --border:rgba(255,255,255,0.07);
+  --gold:#c9a84c;
+  --gold2:#e8cc7a;
+  --goldglow:rgba(201,168,76,0.18);
+  --silver:#8892a4;
+  --text:#e8eaf0;
+  --muted:#5a6278;
+  --green:#2ecc8f;
+  --red:#e05555;
+  --yellow:#e0b455;
+  --r:18px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--ink);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── Noise texture overlay ─────────────────────────── */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size:200px;opacity:.4;
+}
+
+/* ── Ambient gradient orbs ─────────────────────────── */
+.orb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0}
+.orb1{width:700px;height:700px;background:radial-gradient(circle,rgba(201,168,76,0.06),transparent 70%);top:-200px;right:-100px}
+.orb2{width:500px;height:500px;background:radial-gradient(circle,rgba(46,204,143,0.04),transparent 70%);bottom:-100px;left:-100px}
+.orb3{width:400px;height:400px;background:radial-gradient(circle,rgba(100,130,255,0.05),transparent 70%);top:50%;left:40%}
+
+/* ── Thin top accent line ──────────────────────────── */
+.top-line{
+  position:fixed;top:0;left:0;right:0;height:1px;z-index:100;
+  background:linear-gradient(90deg,transparent 0%,var(--gold) 30%,var(--gold2) 50%,var(--gold) 70%,transparent 100%);
+}
+
+/* ── Navigation ────────────────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:50;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:22px 48px;
+  background:rgba(5,8,15,0.7);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+}
+.nav-brand{
+  display:flex;align-items:center;gap:14px;
+}
+.nav-logo-box{
+  width:36px;height:36px;border-radius:8px;
+  background:linear-gradient(135deg,var(--gold),#8b6914);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+  box-shadow:0 0 20px var(--goldglow);
+}
+.nav-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;font-weight:500;
+  letter-spacing:0.5px;color:#fff;
+}
+.nav-name span{color:var(--gold)}
+.nav-pills{display:flex;gap:8px;align-items:center}
+.nav-pill{
+  font-size:11px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;
+  padding:5px 14px;border-radius:999px;color:var(--silver);
+  border:1px solid var(--border);
+  background:rgba(255,255,255,0.02);
+}
+.nav-pill.live{
+  color:var(--green);border-color:rgba(46,204,143,0.3);
+  background:rgba(46,204,143,0.06);
+}
+.nav-pill.live::before{
+  content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--green);margin-right:7px;
+  animation:pulse-dot 2s ease infinite;
+}
+@keyframes pulse-dot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(46,204,143,0.4)}50%{opacity:.7;box-shadow:0 0 0 4px rgba(46,204,143,0)}}
+
+/* ── Page wrapper ──────────────────────────────────── */
+.page{
+  position:relative;z-index:1;
+  max-width:860px;margin:0 auto;
+  padding:140px 24px 100px;
+}
+
+/* ── Hero section ──────────────────────────────────── */
+.hero{text-align:center;margin-bottom:72px}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:10px;
+  font-size:11px;letter-spacing:3px;text-transform:uppercase;font-weight:500;
+  color:var(--gold);margin-bottom:28px;
+}
+.hero-eyebrow::before,.hero-eyebrow::after{
+  content:'';flex:1;height:1px;width:40px;
+  background:linear-gradient(90deg,transparent,var(--gold));
+}
+.hero-eyebrow::after{transform:scaleX(-1)}
+.hero h1{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(48px,7vw,80px);
+  font-weight:300;line-height:1.05;
+  letter-spacing:-1px;
+  color:#fff;margin-bottom:24px;
+}
+.hero h1 em{
+  font-style:italic;
+  background:linear-gradient(135deg,var(--gold2),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-sub{
+  font-size:16px;color:var(--silver);line-height:1.8;
+  max-width:480px;margin:0 auto;font-weight:300;
+}
+
+/* ── Glass panel ───────────────────────────────────── */
+.panel{
+  background:rgba(255,255,255,0.025);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  position:relative;overflow:hidden;
+  margin-bottom:20px;
+}
+.panel::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(201,168,76,0.4),transparent);
+}
+.panel-body{padding:36px 40px}
+
+/* ── Section label ─────────────────────────────────── */
+.section-label{
+  display:flex;align-items:center;gap:12px;
+  font-size:11px;letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--gold);font-weight:500;margin-bottom:28px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── Drop zones ────────────────────────────────────── */
+.drop-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.drop-zone{
+  border:1px dashed rgba(201,168,76,0.2);
+  border-radius:12px;padding:32px 20px;
+  text-align:center;cursor:pointer;
+  transition:all .3s cubic-bezier(.4,0,.2,1);
+  background:rgba(201,168,76,0.02);
+  position:relative;overflow:hidden;
+}
+.drop-zone::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 100%,rgba(201,168,76,0.05),transparent 70%);
+  opacity:0;transition:opacity .3s;
+}
+.drop-zone:hover{
+  border-color:rgba(201,168,76,0.5);
+  background:rgba(201,168,76,0.04);
+  transform:translateY(-2px);
+}
+.drop-zone:hover::before{opacity:1}
+.drop-zone.dragover{
+  border-color:var(--gold);
+  background:rgba(201,168,76,0.07);
+  box-shadow:0 0 30px rgba(201,168,76,0.1);
+}
+.drop-zone.has-file{
+  border-color:rgba(46,204,143,0.4);
+  background:rgba(46,204,143,0.03);
+}
+.dz-icon{font-size:32px;margin-bottom:12px;display:block;filter:drop-shadow(0 0 8px rgba(201,168,76,0.3))}
+.dz-title{font-size:13px;font-weight:500;color:var(--text);margin-bottom:5px}
+.dz-sub{font-size:11px;color:var(--muted)}
+.dz-file{
+  margin-top:10px;font-size:12px;color:var(--green);font-weight:500;
+  font-family:'DM Mono',monospace;display:none;
+}
+.dz-file.visible{display:block}
+input[type="file"]{display:none}
+
+/* ── Run button ────────────────────────────────────── */
+.run-btn{
+  width:100%;padding:18px;border:none;border-radius:12px;
+  background:linear-gradient(135deg,#c9a84c 0%,#e8cc7a 40%,#c9a84c 100%);
+  background-size:200% 100%;
+  color:#0a0804;
+  font-family:'DM Sans',sans-serif;
+  font-size:15px;font-weight:600;
+  letter-spacing:0.5px;cursor:pointer;
+  transition:all .3s cubic-bezier(.4,0,.2,1);
+  position:relative;overflow:hidden;
+}
+.run-btn::before{
+  content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);
+  transition:left .5s;
+}
+.run-btn:hover:not(:disabled)::before{left:100%}
+.run-btn:hover:not(:disabled){
+  transform:translateY(-2px);
+  box-shadow:0 8px 30px rgba(201,168,76,0.4);
+  background-position:right;
+}
+.run-btn:disabled{
+  background:rgba(255,255,255,0.05);
+  color:var(--muted);cursor:not-allowed;
+  box-shadow:none;transform:none;
+}
+.run-btn:disabled::before{display:none}
+
+/* ── Error box ─────────────────────────────────────── */
+.err-box{
+  background:rgba(224,85,85,0.08);
+  border:1px solid rgba(224,85,85,0.25);
+  border-radius:10px;padding:14px 18px;
+  color:#ff8080;display:none;margin-top:16px;
+  font-size:13px;font-family:'DM Mono',monospace;
+}
+
+/* ── Progress panel ────────────────────────────────── */
+#progressPanel{display:none}
+.prog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.prog-label{font-size:13px;color:var(--gold);font-weight:500;letter-spacing:.5px}
+.prog-pct{
+  font-family:'Cormorant Garamond',serif;
+  font-size:28px;font-weight:300;color:#fff;letter-spacing:-1px;
+}
+.prog-track{
+  height:2px;background:rgba(255,255,255,0.06);
+  border-radius:999px;overflow:hidden;margin-bottom:12px;
+}
+.prog-fill{
+  height:100%;border-radius:999px;width:0%;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));
+  transition:width .7s cubic-bezier(.4,0,.2,1);
+  position:relative;
+}
+.prog-fill::after{
+  content:'';position:absolute;right:0;top:-3px;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--gold2);
+  box-shadow:0 0 10px var(--gold);
+}
+.prog-step{
+  font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;
+  text-align:right;min-height:18px;margin-bottom:20px;
+}
+
+/* ── Terminal log ──────────────────────────────────── */
+.terminal{
+  background:#020408;
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px;overflow:hidden;
+}
+.terminal-bar{
+  background:rgba(255,255,255,0.03);
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  padding:10px 16px;
+  display:flex;align-items:center;gap:8px;
+}
+.t-dot{width:10px;height:10px;border-radius:50%}
+.t-dot:nth-child(1){background:#e05555}
+.t-dot:nth-child(2){background:#e0b455}
+.t-dot:nth-child(3){background:#2ecc8f}
+.terminal-title{
+  font-size:11px;color:var(--muted);letter-spacing:1px;
+  text-transform:uppercase;margin-left:8px;font-family:'DM Mono',monospace;
+}
+.terminal-body{
+  padding:16px;max-height:260px;overflow-y:auto;
+  font-family:'DM Mono',monospace;font-size:12px;line-height:1.9;
+}
+.terminal-body::-webkit-scrollbar{width:3px}
+.terminal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.log-line{padding:1px 0}
+.log-line.ok{color:#2ecc8f}
+.log-line.err{color:#e05555}
+.log-line.info{color:#5a6278}
+.log-line.ok::before{content:'+ ';color:rgba(46,204,143,0.5)}
+.log-line.err::before{content:'! ';color:rgba(224,85,85,0.5)}
+.log-line.info::before{content:'  '}
+.cursor-blink{
+  display:inline-block;width:7px;height:14px;
+  background:var(--gold);vertical-align:middle;margin-left:2px;
+  animation:blink 1s step-end infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── Results panel ─────────────────────────────────── */
+#resultPanel{display:none}
+.metrics-row{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:16px;margin-bottom:32px;
+}
+.metric{
+  background:rgba(255,255,255,0.02);
+  border:1px solid var(--border);
+  border-radius:14px;padding:24px 20px;
+  text-align:center;
+  transition:transform .2s,border-color .2s;
+  position:relative;overflow:hidden;
+}
+.metric::before{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+}
+.metric.m-total::before{background:linear-gradient(90deg,transparent,rgba(136,146,255,0.5),transparent)}
+.metric.m-match::before{background:linear-gradient(90deg,transparent,rgba(46,204,143,0.5),transparent)}
+.metric.m-miss::before{background:linear-gradient(90deg,transparent,rgba(224,85,85,0.5),transparent)}
+.metric:hover{transform:translateY(-3px)}
+.metric-num{
+  font-family:'Cormorant Garamond',serif;
+  font-size:52px;font-weight:300;
+  line-height:1;margin-bottom:8px;letter-spacing:-2px;
+}
+.metric.m-total .metric-num{color:#8892ff}
+.metric.m-match .metric-num{color:var(--green)}
+.metric.m-miss  .metric-num{color:var(--red)}
+.metric-label{
+  font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);font-weight:500;
+}
+
+/* ── Download button ───────────────────────────────── */
+.dl-btn{
+  width:100%;padding:18px;border:none;border-radius:12px;
+  background:transparent;
+  border:1px solid rgba(46,204,143,0.3);
+  color:var(--green);
+  font-family:'DM Sans',sans-serif;
+  font-size:15px;font-weight:500;cursor:pointer;
+  transition:all .3s;
+  display:flex;align-items:center;justify-content:center;gap:12px;
+}
+.dl-btn:hover{
+  background:rgba(46,204,143,0.08);
+  border-color:rgba(46,204,143,0.6);
+  box-shadow:0 0 30px rgba(46,204,143,0.1);
+  transform:translateY(-2px);
+}
+.dl-icon{font-size:18px}
+
+/* ── How it works ──────────────────────────────────── */
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.step-card{
+  background:rgba(255,255,255,0.02);
+  border:1px solid var(--border);
+  border-radius:12px;padding:22px 18px;
+  transition:all .3s;
+}
+.step-card:hover{
+  border-color:rgba(201,168,76,0.25);
+  transform:translateY(-3px);
+}
+.step-num{
+  font-family:'Cormorant Garamond',serif;
+  font-size:36px;font-weight:300;
+  color:rgba(201,168,76,0.25);
+  line-height:1;margin-bottom:12px;
+}
+.step-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
+.step-desc{font-size:12px;color:var(--muted);line-height:1.7}
+
+/* ── Footer ────────────────────────────────────────── */
+footer{
+  text-align:center;padding:40px 0 60px;position:relative;z-index:1;
+}
+.footer-brand{
+  font-family:'Cormorant Garamond',serif;
+  font-size:13px;color:var(--muted);letter-spacing:1px;
+}
+.footer-brand strong{color:var(--gold);font-weight:400}
+.footer-rule{
+  width:60px;height:1px;margin:16px auto;
+  background:linear-gradient(90deg,transparent,var(--border),transparent);
+}
+
+/* ── Animations ────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .7s cubic-bezier(.4,0,.2,1) both}
+.fade-up:nth-child(2){animation-delay:.1s}
+.fade-up:nth-child(3){animation-delay:.2s}
+.fade-up:nth-child(4){animation-delay:.3s}
+
+@media(max-width:640px){
+  .drop-row{grid-template-columns:1fr}
+  .steps-grid{grid-template-columns:1fr 1fr}
+  nav{padding:18px 20px}
+  .page{padding:120px 16px 80px}
+  .panel-body{padding:24px 20px}
+  .metrics-row{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body>
-  <div class="header">
-    <h1>Purchase Audit System</h1>
-    <span class="badge">OCR + Smart Matching</span>
+
+<div class="top-line"></div>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo-box">&#x1F9FE;</div>
+    <div class="nav-name">Audit<span>Lens</span></div>
   </div>
-  <div class="container">
-    <div class="card">
-      <h2>Upload Files</h2>
-      <div class="upload-area" id="dropZone"
-           onclick="document.getElementById('fileInput').click()">
-        <div class="icon">&#x1F4E6;</div>
-        <p><strong>Click to upload</strong> or drag and drop</p>
-        <p>ZIP file containing bill images (JPG, PNG, PDF)</p>
-        <p id="fileName" style="color:#3b82f6;margin-top:10px;font-weight:600;"></p>
-      </div>
-      <input type="file" id="fileInput" accept=".zip" onchange="handleFile(this)">
+  <div class="nav-pills">
+    <div class="nav-pill">v2.0</div>
+    <div class="nav-pill live">System Online</div>
+  </div>
+</nav>
 
-      <label style="color:#94a3b8;font-size:14px;display:block;margin-top:15px;">
-        Zoho Excel or CSV (for matching):
-      </label>
-      <div class="csv-upload" onclick="document.getElementById('csvInput').click()">
-        <p style="color:#94a3b8;"><strong style="color:#3b82f6;">Click</strong> to upload Excel or CSV</p>
-        <p id="csvName" style="color:#3b82f6;font-size:13px;margin-top:5px;"></p>
-      </div>
-      <input type="file" id="csvInput" accept=".csv,.xlsx,.xls"
-             onchange="document.getElementById('csvName').textContent='OK: '+(this.files[0]?.name||'')">
+<div class="page">
 
-      <button class="btn" id="uploadBtn" onclick="startAudit()" disabled>Start Audit</button>
+  <!-- Hero -->
+  <div class="hero fade-up">
+    <div class="hero-eyebrow">Purchase Intelligence Platform</div>
+    <h1>Audit Every Bill.<br><em>Instantly.</em></h1>
+    <p class="hero-sub">Upload your bill images and Zoho export. The engine OCR-scans every document, matches records with precision, and delivers a verified audit report.</p>
+  </div>
+
+  <!-- Upload Panel -->
+  <div class="panel fade-up">
+    <div class="panel-body">
+      <div class="section-label">Upload Files</div>
+
+      <div class="drop-row">
+        <div class="drop-zone" id="zipZone" onclick="document.getElementById('fileInput').click()">
+          <div class="dz-icon">&#x1F5C2;</div>
+          <div class="dz-title">Bill Images ZIP</div>
+          <div class="dz-sub">JPG &middot; PNG &middot; PDF supported</div>
+          <div class="dz-file" id="zipLabel"></div>
+          <input type="file" id="fileInput" accept=".zip" onchange="handleZip(this)"/>
+        </div>
+
+        <div class="drop-zone" id="csvZone" onclick="document.getElementById('csvInput').click()">
+          <div class="dz-icon">&#x1F4CA;</div>
+          <div class="dz-title">Zoho Excel / CSV</div>
+          <div class="dz-sub">Reference file for matching</div>
+          <div class="dz-file" id="csvLabel"></div>
+          <input type="file" id="csvInput" accept=".csv,.xlsx,.xls" onchange="handleCsv(this)"/>
+        </div>
+      </div>
+
+      <button class="run-btn" id="runBtn" onclick="startAudit()" disabled>
+        Begin Audit
+      </button>
       <div class="err-box" id="errBox"></div>
     </div>
-
-    <div class="card progress-area" id="progressCard">
-      <h2>Processing Bills...</h2>
-      <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
-      <p class="status-text" id="statusText">Starting...</p>
-      <div class="log" id="logArea"></div>
-    </div>
-
-    <div class="card result-area" id="resultCard">
-      <h2>Audit Complete!</h2>
-      <div class="stats">
-        <div class="stat"><div class="num" id="statTotal">0</div><div class="label">Bills Processed</div></div>
-        <div class="stat"><div class="num" id="statMatched" style="color:#10b981">0</div><div class="label">Matched</div></div>
-        <div class="stat"><div class="num" id="statMismatch" style="color:#ef4444">0</div><div class="label">Not Found / Mismatch</div></div>
-      </div>
-      <button class="download-btn" id="dlBtn">Download Excel Report</button>
-    </div>
-
-    <div class="powered">Purchase Audit System - Built by Shubham Hulsure</div>
   </div>
 
-  <script>
-    let zipFile = null, currentJobId = null, pollTimer = null;
+  <!-- Progress Panel -->
+  <div class="panel" id="progressPanel">
+    <div class="panel-body">
+      <div class="section-label">Processing</div>
+      <div class="prog-header">
+        <span class="prog-label" id="progLabel">Initialising...</span>
+        <span class="prog-pct"><span id="pctNum">0</span>%</span>
+      </div>
+      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-step" id="progStep">&nbsp;</div>
 
-    function handleFile(input) {
-      zipFile = input.files[0];
-      document.getElementById('fileName').textContent = zipFile ? 'Selected: ' + zipFile.name : '';
-      document.getElementById('uploadBtn').disabled = !zipFile;
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div>
+          <span class="terminal-title">OCR Output Stream</span>
+        </div>
+        <div class="terminal-body" id="logArea">
+          <span class="cursor-blink"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Panel -->
+  <div class="panel" id="resultPanel">
+    <div class="panel-body">
+      <div class="section-label">Audit Results</div>
+      <div class="metrics-row">
+        <div class="metric m-total">
+          <div class="metric-num" id="statTotal">0</div>
+          <div class="metric-label">Records Audited</div>
+        </div>
+        <div class="metric m-match">
+          <div class="metric-num" id="statMatched">0</div>
+          <div class="metric-label">Confirmed Matched</div>
+        </div>
+        <div class="metric m-miss">
+          <div class="metric-num" id="statMismatch">0</div>
+          <div class="metric-label">Requires Review</div>
+        </div>
+      </div>
+      <button class="dl-btn" id="dlBtn">
+        <span class="dl-icon">&#x2913;</span>
+        Download Excel Report
+      </button>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="panel fade-up">
+    <div class="panel-body">
+      <div class="section-label">How It Works</div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-num">01</div>
+          <div class="step-title">Upload</div>
+          <div class="step-desc">Drop your ZIP of bill images and your Zoho CSV export.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">02</div>
+          <div class="step-title">OCR Scan</div>
+          <div class="step-desc">Every bill image is scanned using Tesseract AI to extract all text.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">03</div>
+          <div class="step-title">Smart Match</div>
+          <div class="step-desc">Bill number, vendor, item and amount are matched using fuzzy intelligence.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">04</div>
+          <div class="step-title">Report</div>
+          <div class="step-desc">Colour-coded Excel report: green matched, yellow review, red not found.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-rule"></div>
+  <div class="footer-brand">AuditLens &mdash; Built by <strong>Shubham Hulsure</strong></div>
+</footer>
+
+<script>
+let zipFile = null, currentJobId = null, pollTimer = null;
+
+function handleZip(input) {
+  zipFile = input.files[0];
+  const lbl = document.getElementById('zipLabel');
+  const zone = document.getElementById('zipZone');
+  if (zipFile) {
+    lbl.textContent = zipFile.name;
+    lbl.classList.add('visible');
+    zone.classList.add('has-file');
+  }
+  checkReady();
+}
+
+function handleCsv(input) {
+  const lbl = document.getElementById('csvLabel');
+  const zone = document.getElementById('csvZone');
+  if (input.files[0]) {
+    lbl.textContent = input.files[0].name;
+    lbl.classList.add('visible');
+    zone.classList.add('has-file');
+  }
+  checkReady();
+}
+
+function checkReady() {
+  document.getElementById('runBtn').disabled = !zipFile;
+}
+
+// Drag-drop for zip zone
+const zipZone = document.getElementById('zipZone');
+zipZone.addEventListener('dragover', e => { e.preventDefault(); zipZone.classList.add('dragover'); });
+zipZone.addEventListener('dragleave', () => zipZone.classList.remove('dragover'));
+zipZone.addEventListener('drop', e => {
+  e.preventDefault(); zipZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.zip')) {
+    zipFile = f;
+    document.getElementById('zipLabel').textContent = f.name;
+    document.getElementById('zipLabel').classList.add('visible');
+    zipZone.classList.add('has-file');
+    checkReady();
+  }
+});
+
+function addLog(msg, type) {
+  const log = document.getElementById('logArea');
+  // Remove cursor first
+  const cur = log.querySelector('.cursor-blink');
+  if (cur) cur.remove();
+  const div = document.createElement('div');
+  div.className = 'log-line ' + (type || 'info');
+  div.textContent = msg;
+  log.appendChild(div);
+  // Re-add cursor
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor-blink';
+  log.appendChild(cursor);
+  log.scrollTop = log.scrollHeight;
+}
+
+function showErr(msg) {
+  const b = document.getElementById('errBox');
+  b.textContent = msg;
+  b.style.display = 'block';
+}
+
+function animateNum(el, target) {
+  let start = 0;
+  const dur = 1400;
+  const t0 = performance.now();
+  function step(now) {
+    const p = Math.min((now - t0) / dur, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.floor(ease * target);
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = target;
+  }
+  requestAnimationFrame(step);
+}
+
+async function startAudit() {
+  if (!zipFile) return;
+  document.getElementById('errBox').style.display = 'none';
+  document.getElementById('logArea').innerHTML = '<span class="cursor-blink"></span>';
+  document.getElementById('resultPanel').style.display = 'none';
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading...';
+
+  document.getElementById('progressPanel').style.display = 'block';
+  document.getElementById('progFill').style.width = '3%';
+  document.getElementById('pctNum').textContent = '3';
+  document.getElementById('progLabel').textContent = 'Uploading files...';
+
+  const fd = new FormData();
+  fd.append('zip_file', zipFile);
+  const csvFile = document.getElementById('csvInput').files[0];
+  if (csvFile) fd.append('csv_file', csvFile);
+
+  try {
+    const res  = await fetch('/start', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.job_id) { showErr(data.error || 'Upload failed'); btn.disabled = false; btn.textContent = 'Begin Audit'; return; }
+    currentJobId = data.job_id;
+    btn.textContent = 'Processing...';
+    addLog('Files received. Starting OCR pipeline...', 'ok');
+    pollTimer = setInterval(pollStatus, 2500);
+  } catch(e) {
+    showErr(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Begin Audit';
+  }
+}
+
+async function pollStatus() {
+  if (!currentJobId) return;
+  try {
+    const res = await fetch('/status/' + currentJobId);
+    const job = await res.json();
+
+    const pct = job.progress || 0;
+    document.getElementById('progFill').style.width = pct + '%';
+    document.getElementById('pctNum').textContent   = pct;
+    document.getElementById('progStep').textContent  = job.step || '';
+    document.getElementById('progLabel').textContent =
+      pct < 20 ? 'Extracting files...' :
+      pct < 68 ? 'Running OCR scan...' :
+      pct < 90 ? 'Matching records...' : 'Generating report...';
+
+    if (job.new_logs && job.new_logs.length) {
+      job.new_logs.forEach(l => addLog(l.msg, l.type));
     }
 
-    const dropZone = document.getElementById('dropZone');
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', e => {
-      e.preventDefault(); dropZone.classList.remove('dragover');
-      const f = e.dataTransfer.files[0];
-      if (f && f.name.endsWith('.zip')) {
-        zipFile = f;
-        document.getElementById('fileName').textContent = 'Selected: ' + f.name;
-        document.getElementById('uploadBtn').disabled = false;
-      }
-    });
+    if (job.status === 'done') {
+      clearInterval(pollTimer);
+      document.getElementById('progLabel').textContent = 'Complete';
 
-    function addLog(msg, type) {
-      const log = document.getElementById('logArea');
-      const div = document.createElement('div');
-      div.className = 'log-item ' + (type || 'info');
-      div.textContent = msg;
-      log.appendChild(div);
-      log.scrollTop = log.scrollHeight;
+      const r = document.getElementById('resultPanel');
+      r.style.display = 'block';
+      r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      animateNum(document.getElementById('statTotal'),    job.summary.total);
+      animateNum(document.getElementById('statMatched'),  job.summary.matched);
+      animateNum(document.getElementById('statMismatch'), job.summary.mismatch);
+
+      document.getElementById('dlBtn').onclick = () => {
+        window.location.href = '/download/' + currentJobId;
+      };
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('runBtn').textContent = 'Begin Audit';
     }
 
-    function showErr(msg) {
-      const b = document.getElementById('errBox');
-      b.textContent = 'Error: ' + msg;
-      b.style.display = 'block';
+    if (job.status === 'error') {
+      clearInterval(pollTimer);
+      showErr(job.error || 'Something went wrong.');
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('runBtn').textContent = 'Begin Audit';
     }
-
-    async function startAudit() {
-      if (!zipFile) return;
-      document.getElementById('errBox').style.display = 'none';
-      document.getElementById('logArea').innerHTML = '';
-      document.getElementById('resultCard').style.display = 'none';
-
-      const btn = document.getElementById('uploadBtn');
-      btn.disabled = true; btn.textContent = 'Uploading...';
-      document.getElementById('progressCard').style.display = 'block';
-      document.getElementById('progressBar').style.width = '5%';
-      document.getElementById('statusText').textContent = 'Uploading files...';
-
-      const fd = new FormData();
-      fd.append('zip_file', zipFile);
-      const csvFile = document.getElementById('csvInput').files[0];
-      if (csvFile) fd.append('csv_file', csvFile);
-
-      try {
-        const res  = await fetch('/start', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!data.job_id) { showErr(data.error || 'Upload failed'); btn.disabled = false; btn.textContent = 'Start Audit'; return; }
-        currentJobId = data.job_id;
-        btn.textContent = 'Processing...';
-        addLog('Files uploaded. OCR started in background...', 'ok');
-        pollTimer = setInterval(pollStatus, 2500);
-      } catch(e) {
-        showErr(e.message); btn.disabled = false; btn.textContent = 'Start Audit';
-      }
-    }
-
-    async function pollStatus() {
-      if (!currentJobId) return;
-      try {
-        const res = await fetch('/status/' + currentJobId);
-        const job = await res.json();
-
-        document.getElementById('progressBar').style.width  = job.progress + '%';
-        document.getElementById('statusText').textContent   = job.step || 'Processing...';
-
-        if (job.new_logs && job.new_logs.length) {
-          job.new_logs.forEach(l => addLog(l.msg, l.type));
-        }
-
-        if (job.status === 'done') {
-          clearInterval(pollTimer);
-          document.getElementById('statTotal').textContent    = job.summary.total;
-          document.getElementById('statMatched').textContent  = job.summary.matched;
-          document.getElementById('statMismatch').textContent = job.summary.mismatch;
-          document.getElementById('resultCard').style.display = 'block';
-          document.getElementById('dlBtn').onclick = () => { window.location.href = '/download/' + currentJobId; };
-          document.getElementById('uploadBtn').disabled = false;
-          document.getElementById('uploadBtn').textContent = 'Start Audit';
-        }
-
-        if (job.status === 'error') {
-          clearInterval(pollTimer);
-          showErr(job.error || 'Something went wrong.');
-          document.getElementById('uploadBtn').disabled = false;
-          document.getElementById('uploadBtn').textContent = 'Start Audit';
-        }
-      } catch(e) { /* network blip — keep polling */ }
-    }
-  </script>
+  } catch(e) { /* network blip */ }
+}
+</script>
 </body>
-</html>
-"""
+</html>"""
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -271,13 +777,30 @@ def ocr_image(path):
     except Exception as e:
         print(f"OCR error {path}: {e}"); return ""
 
+# ── Scoring engine ─────────────────────────────────────────────────────────────
+
+def bill_number_score(bill_no, ocr_text):
+    if not bill_no or len(bill_no) < 3:
+        return 0
+    pattern = r'\b' + re.escape(bill_no) + r'\b'
+    if re.search(pattern, ocr_text):
+        if bill_no.isdigit() and len(bill_no) <= 4:
+            return 35
+        elif bill_no.isdigit() and len(bill_no) <= 6:
+            return 50
+        else:
+            return 65
+    else:
+        ratio = fuzz.partial_ratio(bill_no, ocr_text)
+        if bill_no.isdigit() and len(bill_no) <= 4:
+            return ratio * 0.15
+        return ratio * 0.25
+
 def score_match(bill_no, vendor, item, amount_str, ocr_text):
     if not ocr_text: return 0
-    score = 0
-    if bill_no and len(bill_no) >= 3:
-        score += 60 if bill_no in ocr_text else fuzz.partial_ratio(bill_no, ocr_text) * 0.30
+    score = bill_number_score(bill_no, ocr_text)
     if vendor and len(vendor) >= 3:
-        score += fuzz.partial_ratio(vendor, ocr_text) * 0.20
+        score += fuzz.partial_ratio(vendor, ocr_text) * 0.25
     if item and len(item) >= 2:
         score += fuzz.partial_ratio(item, ocr_text) * 0.10
     if amount_str:
@@ -287,15 +810,17 @@ def score_match(bill_no, vendor, item, amount_str, ocr_text):
     return min(round(score, 1), 100)
 
 def classify(score):
-    if score >= 70:   return "Matched",              "Strong match"
+    if score >= 75:   return "Matched",              "Strong multi-field match confirmed"
     elif score >= 45: return "Mismatch / Duplicate", "Partial match - verify manually"
     else:             return "Not Found",             "No matching bill image detected"
+
+# ── Excel writer ───────────────────────────────────────────────────────────────
 
 def generate_excel(results, output_path):
     wb = Workbook(); ws = wb.active; ws.title = "Audit Report"
     headers = ["File Name","Folder","Bill Number","Bill Date","Vendor Name",
                "Customer/Hotel","Item Description","Quantity","Rate (Rs)",
-               "Total Amount (Rs)","AI Confidence","Match Status"]
+               "Total Amount (Rs)","AI Confidence","Match Status","Match Detail"]
     hfill = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
     hfont = Font(bold=True, color="FFFFFF", size=11)
     for col, h in enumerate(headers, 1):
@@ -311,17 +836,18 @@ def generate_excel(results, output_path):
         row_data = [r.get("file_name",""), r.get("folder",""), r.get("bill_number",""),
                     r.get("bill_date",""), r.get("vendor_name",""), r.get("customer_name",""),
                     r.get("item_description",""), r.get("quantity",""), r.get("rate",""),
-                    r.get("total_amount",""), r.get("confidence",""), r.get("match_status","")]
+                    r.get("total_amount",""), r.get("confidence",""),
+                    r.get("match_status",""), r.get("match_detail","")]
         status = r.get("match_status","")
-        if   status == "Matched":         row_fill = green
-        elif status == "Not Found":       row_fill = red
-        elif "Mismatch" in status:        row_fill = yellow
-        else:                             row_fill = alt if i % 2 == 0 else None
+        if   status == "Matched":     row_fill = green
+        elif status == "Not Found":   row_fill = red
+        elif "Mismatch" in status:    row_fill = yellow
+        else:                         row_fill = alt if i % 2 == 0 else None
         for col, val in enumerate(row_data, 1):
             cell = ws.cell(row=i, column=col, value=val)
             cell.alignment = Alignment(vertical="center")
             if row_fill: cell.fill = row_fill
-    col_widths = [22,18,15,12,30,25,25,10,12,15,12,14]
+    col_widths = [22,18,15,12,30,25,25,10,12,15,12,14,35]
     for col, width in enumerate(col_widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
     ws.freeze_panes = "A2"
@@ -337,35 +863,31 @@ def run_audit(job_id, work_dir, zip_path, csv_path):
         job["new_logs"].append({"msg": msg, "type": t})
 
     def update(progress, step):
-        job["progress"] = progress
-        job["step"] = step
+        job["progress"] = progress; job["step"] = step
 
     try:
-        # 1 — Extract ZIP
         update(8, "Extracting ZIP file...")
         extract_dir = os.path.join(work_dir, "extracted")
         os.makedirs(extract_dir, exist_ok=True)
         with zipfile.ZipFile(zip_path, "r") as z:
             z.extractall(extract_dir)
 
-        # 2 — Read reference file
         csv_df = None
         if csv_path and os.path.exists(csv_path):
-            update(12, "Reading Excel / CSV data...")
+            update(12, "Reading reference file...")
             try:
                 csv_df = pd.read_csv(csv_path) if csv_path.endswith(".csv") \
                          else pd.read_excel(csv_path, engine="openpyxl")
                 csv_df.columns = csv_df.columns.str.strip()
-                log(f"Loaded reference file: {len(csv_df)} rows", "ok")
+                log(f"Reference file loaded — {len(csv_df)} rows", "ok")
             except Exception as e:
                 log(f"Could not read reference file: {e}", "err")
 
-        # 3 — Collect images
-        update(16, "Scanning for bill images...")
+        update(16, "Scanning ZIP for bill images...")
         bill_images = []
         for root, dirs, files in os.walk(extract_dir):
             for f in files:
-                rel = os.path.relpath(os.path.join(root, f), extract_dir)
+                rel  = os.path.relpath(os.path.join(root, f), extract_dir)
                 full = os.path.join(root, f)
                 if is_ignored(rel): continue
                 ext = os.path.splitext(f)[1].lower()
@@ -377,7 +899,6 @@ def run_audit(job_id, work_dir, zip_path, csv_path):
         total_imgs = len(bill_images)
         log(f"Found {total_imgs} bill files in ZIP", "info")
 
-        # 4 — OCR
         ocr_cache = []
         for i, (img_path, rel_path) in enumerate(bill_images):
             update(16 + int((i / max(total_imgs, 1)) * 50),
@@ -388,14 +909,14 @@ def run_audit(job_id, work_dir, zip_path, csv_path):
                 log(f"OCR OK: {os.path.basename(rel_path)}", "ok")
             else:
                 log(f"OCR empty: {os.path.basename(rel_path)}", "err")
-            job["new_logs"] = job["new_logs"][-30:]  # keep buffer lean
+            job["new_logs"] = job["new_logs"][-30:]
 
-        # 5 — Match
         results = []
         if csv_df is not None:
             update(68, "Matching Excel rows to bills...")
-            log("Matching Excel rows to bill images...", "info")
+            log("Matching records to bill images...", "info")
             total_rows = len(csv_df)
+
             for idx, (_, row) in enumerate(csv_df.iterrows()):
                 update(68 + int((idx / max(total_rows, 1)) * 22),
                        f"Matching row {idx+1}/{total_rows}...")
@@ -403,10 +924,22 @@ def run_audit(job_id, work_dir, zip_path, csv_path):
                 vendor  = normalize(str(row.get("Vendor Name", "")))
                 item    = normalize(str(row.get("Item Name", "")))
                 amount  = normalize(str(row.get("Item Total", "")))
-                best_score = 0; best_path = ""
+                best_score = 0; best_path = ""; best_signals = ""
+
                 for path, text in ocr_cache:
                     s = score_match(bill_no, vendor, item, amount, text)
-                    if s > best_score: best_score = s; best_path = path
+                    if s > best_score:
+                        best_score = s; best_path = path
+                        sigs = []
+                        if bill_no and re.search(r'\b' + re.escape(bill_no) + r'\b', text):
+                            sigs.append(f"BillNo:{bill_no}")
+                        if vendor and fuzz.partial_ratio(vendor, text) >= 70:
+                            sigs.append(f"Vendor:{int(fuzz.partial_ratio(vendor,text))}%")
+                        amt_stripped = re.sub(r"\.0+$", "", amount.strip())
+                        if amt_stripped and amt_stripped in extract_numbers(text):
+                            sigs.append(f"Amount:{amt_stripped}")
+                        best_signals = " | ".join(sigs) if sigs else "weak fuzzy only"
+
                 status, remark = classify(best_score)
                 results.append({
                     "file_name":        os.path.basename(best_path) if best_path else "",
@@ -421,28 +954,30 @@ def run_audit(job_id, work_dir, zip_path, csv_path):
                     "total_amount":     str(row.get("Item Total",   "")),
                     "confidence":       best_score,
                     "match_status":     status,
+                    "match_detail":     best_signals,
                 })
                 t = "ok" if status == "Matched" else ("err" if status == "Not Found" else "info")
-                log(f"{status} | {row.get('Bill Number','?')} | {str(row.get('Vendor Name',''))[:20]} | score {best_score}", t)
+                log(f"{status} (score {best_score}) | Bill:{row.get('Bill Number','?')} | "
+                    f"{str(row.get('Vendor Name',''))[:18]} | {best_signals}", t)
         else:
             for img_path, _ in ocr_cache:
-                results.append({"file_name": os.path.basename(img_path),
-                                 "folder":"","bill_number":"","bill_date":"",
-                                 "vendor_name":"","customer_name":"","item_description":"",
-                                 "quantity":"","rate":"","total_amount":"",
-                                 "confidence":"","match_status":"No CSV"})
+                results.append({
+                    "file_name": os.path.basename(img_path), "folder":"",
+                    "bill_number":"","bill_date":"","vendor_name":"","customer_name":"",
+                    "item_description":"","quantity":"","rate":"","total_amount":"",
+                    "confidence":"","match_status":"No CSV","match_detail":""
+                })
 
-        # 6 — Write report
         update(92, "Writing Excel report...")
         report_path = os.path.join(REPORT_FOLDER, f"audit_{job_id}.xlsx")
         generate_excel(results, report_path)
 
         matched  = sum(1 for r in results if r["match_status"] == "Matched")
-        mismatch = sum(1 for r in results if r["match_status"] in ("Not Found", "Mismatch / Duplicate"))
-        log(f"Done! {matched} matched, {mismatch} issues out of {len(results)} rows", "ok")
+        mismatch = sum(1 for r in results if r["match_status"] in ("Not Found","Mismatch / Duplicate"))
+        log(f"Audit complete — {matched} matched, {mismatch} flagged, {len(results)} total", "ok")
 
         job.update({
-            "status": "done", "progress": 100, "step": "Complete!",
+            "status": "done", "progress": 100, "step": "Audit complete",
             "report_path": report_path,
             "summary": {"total": len(results), "matched": matched, "mismatch": mismatch}
         })
@@ -463,30 +998,23 @@ def start():
     job_id   = str(uuid.uuid4())[:8]
     work_dir = os.path.join(UPLOAD_FOLDER, job_id)
     os.makedirs(work_dir, exist_ok=True)
-
     zip_file = request.files.get("zip_file")
     if not zip_file:
         return jsonify({"error": "No ZIP file provided"}), 400
-
     zip_path = os.path.join(work_dir, "bills.zip")
     zip_file.save(zip_path)
-
     csv_path = None
     csv_file = request.files.get("csv_file")
     if csv_file:
         ext      = os.path.splitext(csv_file.filename)[1].lower() or ".xlsx"
         csv_path = os.path.join(work_dir, f"data{ext}")
         csv_file.save(csv_path)
-
     jobs[job_id] = {
         "status": "processing", "progress": 5, "step": "Files received...",
         "all_logs": [], "new_logs": [], "summary": {}, "report_path": None, "error": None
     }
-
     t = threading.Thread(target=run_audit, args=(job_id, work_dir, zip_path, csv_path))
-    t.daemon = True
-    t.start()
-
+    t.daemon = True; t.start()
     return jsonify({"job_id": job_id})
 
 @app.route("/status/<job_id>")
@@ -496,7 +1024,7 @@ def status(job_id):
     job = jobs[job_id]
     out = {k: job[k] for k in ("status","progress","step","summary","error")}
     out["new_logs"] = job["new_logs"]
-    job["new_logs"] = []          # flush — only send each log line once
+    job["new_logs"] = []
     return jsonify(out)
 
 @app.route("/download/<job_id>")
